@@ -8,43 +8,43 @@ def extract_date_from_filename(filename):
     patterns = [
         # Format: 20151101_145717
         (r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
-                            int(m[4]), int(m[5]), int(m[6]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]),
+                            int(m[3]), int(m[4]), int(m[5]))),
 
         # Format: 2017-01-14 18.31.48
         (r'(\d{4})-(\d{2})-(\d{2})\s+(\d{2})\.(\d{2})\.(\d{2})',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
-                            int(m[4]), int(m[5]), int(m[6]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]),
+                            int(m[3]), int(m[4]), int(m[5]))),
 
         # Format: 2014-07-11 18.49.29-2 (with suffix)
         (r'(\d{4})-(\d{2})-(\d{2})\s+(\d{2})\.(\d{2})\.(\d{2})(?:-\d+)?',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
-                            int(m[4]), int(m[5]), int(m[6]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]),
+                            int(m[3]), int(m[4]), int(m[5]))),
 
         # Format: YYYY-MM-DD
         (r'(\d{4})-(\d{2})-(\d{2})',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]))),
 
         # Format: YYYYMMDD
         (r'(\d{4})(\d{2})(\d{2})',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]))),
 
         # Format: DD-MM-YYYY
         (r'(\d{2})-(\d{2})-(\d{4})',
-         lambda m: datetime(int(m[3]), int(m[2]), int(m[1]))),
+         lambda m: datetime(int(m[2]), int(m[1]), int(m[0]))),
 
         # Format: DDMMYYYY
         (r'(\d{2})(\d{2})(\d{4})',
-         lambda m: datetime(int(m[3]), int(m[2]), int(m[1]))),
+         lambda m: datetime(int(m[2]), int(m[1]), int(m[0]))),
 
         # Format: {prefix} 20151101_145717
         (r'.*?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
-                            int(m[4]), int(m[5]), int(m[6]))),
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2]),
+                            int(m[3]), int(m[4]), int(m[5]))),
 
         # Format: IMG-20230502-WA0022
         (r'.*?(\d{4})(\d{2})(\d{2}).*',
-         lambda m: datetime(int(m[1]), int(m[2]), int(m[3])))
+         lambda m: datetime(int(m[0]), int(m[1]), int(m[2])))
     ]
     
     for pattern, date_func in patterns:
