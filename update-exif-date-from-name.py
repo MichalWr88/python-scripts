@@ -4,22 +4,59 @@ from datetime import datetime
 import re
 
 def extract_date_from_filename(filename):
-    # Define a regex pattern to match dates in the filename
-    date_pattern = r'\d{4}-\d{2}-\d{2}'
-    match = re.search(date_pattern, filename)
+    # Define regex patterns to match dates in the filename
+    patterns = [
+        # Format: 20151101_145717
+        (r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
+                            int(m[4]), int(m[5]), int(m[6]))),
+
+        # Format: 2017-01-14 18.31.48
+        (r'(\d{4})-(\d{2})-(\d{2})\s+(\d{2})\.(\d{2})\.(\d{2})',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
+                            int(m[4]), int(m[5]), int(m[6]))),
+
+        # Format: 2014-07-11 18.49.29-2 (with suffix)
+        (r'(\d{4})-(\d{2})-(\d{2})\s+(\d{2})\.(\d{2})\.(\d{2})(?:-\d+)?',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
+                            int(m[4]), int(m[5]), int(m[6]))),
+
+        # Format: YYYY-MM-DD
+        (r'(\d{4})-(\d{2})-(\d{2})',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]))),
+
+        # Format: YYYYMMDD
+        (r'(\d{4})(\d{2})(\d{2})',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]))),
+
+        # Format: DD-MM-YYYY
+        (r'(\d{2})-(\d{2})-(\d{4})',
+         lambda m: datetime(int(m[3]), int(m[2]), int(m[1]))),
+
+        # Format: DDMMYYYY
+        (r'(\d{2})(\d{2})(\d{4})',
+         lambda m: datetime(int(m[3]), int(m[2]), int(m[1]))),
+
+        # Format: {prefix} 20151101_145717
+        (r'.*?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3]),
+                            int(m[4]), int(m[5]), int(m[6]))),
+
+        # Format: IMG-20230502-WA0022
+        (r'.*?(\d{4})(\d{2})(\d{2}).*',
+         lambda m: datetime(int(m[1]), int(m[2]), int(m[3])))
+    ]
     
-    if not match:
-        raise ValueError("Invalid date format")
+    for pattern, date_func in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            try:
+                date = date_func(match.groups())
+                return date.strftime("%Y-%m-%d")
+            except ValueError:
+                continue
     
-    date_str = match.group(0)
-    
-    # Validate the date format
-    try:
-        datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise ValueError("Invalid date format")
-    
-    return date_str
+    raise ValueError("Invalid date format")
 
 def get_exif_date(file_path):
     # Placeholder for getting EXIF date
