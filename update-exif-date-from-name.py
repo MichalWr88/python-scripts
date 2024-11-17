@@ -1,18 +1,8 @@
 import argparse
 import os
-import re
 from datetime import datetime
+import re
 
-
-# Function to get EXIF date (placeholder)
-def get_exif_date(file_path):
-    # Your implementation here
-    pass
-
-# Function to set EXIF date (placeholder)
-def set_exif_date(file_path, date):
-    # Your implementation here
-    pass
 def extract_date_from_filename(filename):
     # Define a regex pattern to match dates in the filename
     date_pattern = r'\d{4}-\d{2}-\d{2}'
@@ -31,32 +21,41 @@ def extract_date_from_filename(filename):
     
     return date_str
 
-# Function to process images in a folder
+def get_exif_date(file_path):
+    # Placeholder for getting EXIF date
+    return None
+
+def set_exif_date(file_path, date_str):
+    # Placeholder for setting EXIF date
+    return True
+
+# Function to process images in a folder and its subfolders
 def process_images(folder_path):
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        try:
-            # Your existing code to extract date from filename...
-            filename_date = extract_date_from_filename(filename)
-        except ValueError:
-            print(f"Skipping file {filename}: invalid date format")
-            # Get the current date
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            # Open the file in append mode and write the path
-            with open(f"{current_date}.txt", "a") as f:
-                f.write(f"{file_path}\n")
-            continue
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            try:
+                # Extract date from filename
+                filename_date = extract_date_from_filename(filename)
+            except ValueError:
+                print(f"Skipping file {filename}: invalid date format")
+                # Get the current date
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                # Open the file in append mode and write the path
+                with open(f"{current_date}.txt", "a") as f:
+                    f.write(f"{file_path}\n")
+                continue
 
-        # Get EXIF date
-        exif_date = get_exif_date(file_path)
+            # Get EXIF date
+            exif_date = get_exif_date(file_path)
 
-        # Compare dates and update if necessary
-        if not exif_date or exif_date != filename_date:
-            print(f"Updating EXIF date for {filename}")
-            if set_exif_date(file_path, filename_date):
-                print(f"Successfully updated EXIF date for {filename}")
-            else:
-                print(f"Failed to update EXIF date for {filename}")
+            # Compare dates and update if necessary
+            if not exif_date or exif_date != filename_date:
+                print(f"Updating EXIF date for {filename}")
+                if set_exif_date(file_path, filename_date):
+                    print(f"Successfully updated EXIF date for {filename}")
+                else:
+                    print(f"Failed to update EXIF date for {filename}")
 
 # Example usage
 if __name__ == "__main__":
