@@ -1,7 +1,12 @@
 import argparse
 import os
-from datetime import datetime
 import re
+from datetime import datetime
+from pathlib import Path
+from PIL import Image
+from PIL.ExifTags import TAGS
+import piexif
+from typing import Optional, Tuple
 
 def extract_date_from_filename(filename):
     # Define regex patterns to match dates in the filename
@@ -58,13 +63,59 @@ def extract_date_from_filename(filename):
     
     raise ValueError("Invalid date format")
 
-def get_exif_date(file_path):
-    # Placeholder for getting EXIF date
-    return None
 
-def set_exif_date(file_path, date_str):
-    # Placeholder for setting EXIF date
-    return True
+def set_exif_date(image_path: str, new_date: datetime) -> bool:
+    """Set the creation date in image EXIF metadata."""
+    try:
+        # Format date string for EXIF
+        date_str = new_date.strftime('%Y:%m:%d %H:%M:%S')
+
+        # Load existing EXIF data
+        exif_dict = piexif.load(image_path)
+
+        # Update date fields
+        exif_dict['0th'][306] = date_str  # DateTime
+        exif_dict['Exif'][36867] = date_str  # DateTimeOriginal
+        exif_dict['Exif'][36868] = date_str  # DateTimeDigitized
+
+        # Save updated EXIF
+        exif_bytes = piexif.dump(exif_dict)
+        piexif.insert(exif_bytes, image_path)
+        return True
+
+    except Exception as e:
+        print(f"Error updating EXIF for {image_path}: {str(e)}")
+        return False
+
+def get_exif_date(image_path: str) -> Optional[datetime]:
+    """Extract creation date from image EXIF metadata."""
+    try:
+        image = Image.open(image_path)
+        exif = image.getexif()
+        if not exif:
+            return None
+
+        # Look for different date fields in EXIF
+        date_fields = [
+            36867,  # DateTimeOriginal
+            36868,  # DateTimeDigitized
+            306,    # DateTime
+        ]
+
+        for field in date_fields:
+            if field in exif:
+                try:
+                    date_str = exif[field]
+                    return datetime.strptime(date_str, '%Y:%m:%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
+    except Exception as e:
+        print(f"Error reading EXIF from {image_path}: {str(e)}")
+        return None
+
 
 # Function to process images in a folder and its subfolders
 def process_images(folder_path):
@@ -73,7 +124,8 @@ def process_images(folder_path):
             file_path = os.path.join(root, filename)
             try:
                 # Extract date from filename
-                filename_date = extract_date_from_filename(filename)
+                filename_date_str = extract_date_from_filename(filename)
+                filename_date = datetime.strptime(filename_date_str, "%Y-%m-%d")
             except ValueError:
                 print(f"Skipping file {filename}: invalid date format")
                 # Get the current date
@@ -85,7 +137,7 @@ def process_images(folder_path):
 
             # Get EXIF date
             exif_date = get_exif_date(file_path)
-
+            print(exif_date,file_path)
             # Compare dates and update if necessary
             if not exif_date or exif_date != filename_date:
                 print(f"Updating EXIF date for {filename}")
