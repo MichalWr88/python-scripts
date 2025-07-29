@@ -1,0 +1,37 @@
+{
+  "volumes": [
+    "mariadb_db_data",
+    "portainer_portainer_data",
+    "postgres_postgres_data",
+    "f43e4f72bc46ce03775bc65424df2f4d010814d35f87cbde50da1d5f0d8e2112",
+    "immich_model-cache"
+  ],
+  "containers": [
+    "fastapi-python-scripts-fastapi-app-1",
+    "portainer",
+    "homepage",
+    "n8n-n8n-1",
+    "ollama",
+    "homeassistant",
+    "immich-kiosk",
+    "netdata",
+    "hassio_supervisor",
+    "litellm-litellm-1",
+    "freshrss",
+    "open-webui",
+    "metube",
+    "immich_server",
+    "immich_machine_learning",
+    "adguardhome",
+    "dbgate-dbgate-1",
+    "glances",
+    "wud",
+    "nginx-proxy-manager",
+    "cloudflared",
+    "immich_postgres",
+    "immich_redis",
+    "mariadb"
+  ],
+  "backup_dir": "/mnt/pendrak1/backup-docker",
+  "webhook_url": "https://n8nmm.czartoha.pl/webhook-test/8a4769b0-d730-4ebb-b9ee-0d47cbb2a278"
+}
