@@ -1,0 +1,48 @@
+{
+  "databases": [
+    {
+      "name": "moja_mariadb",
+      "type": "mariadb",
+      "host": "localhost",
+      "port": 3306,
+      "user": "root",
+      "password": "haslo",
+      "database": "db_test",
+      "backup_path": "./backups/mariadb",
+      "docker_container": "mariadb_container"
+    },
+    {
+      "name": "moja_postgres",
+      "type": "postgresql",
+      "host": "remote.host.com",
+      "port": 5432,
+      "user": "postgres",
+      "password": "haslo",
+      "database": "db_prod",
+      "backup_path": "./backups/postgres",
+      "docker_container": "postgres_container"
+    },
+    {
+      "name": "moja_postgres",
+      "type": "postgresql",
+      "host": "remote.host.com",
+      "port": 5432,
+      "user": "postgres",
+      "password": "haslo",
+      "database": "db_prod",
+      "backup_path": "./backups/postgres",
+      "docker_container": "postgres_container"
+    },
+    {
+      "name": "moja_mongo",
+      "type": "mongodb",
+      "host": "localhost",
+      "port": 27017,
+      "user": "mongoUser",
+      "password": "haslo",
+      "database": "mongo_db",
+      "backup_path": "./backups/mongodb",
+      "docker_container": "mongo_container"
+    }
+  ]
+}
