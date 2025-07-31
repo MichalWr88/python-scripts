@@ -1,0 +1,86 @@
+{
+    "databases": [
+        {
+            "name": "freshrss",
+            "type": "postgresql",
+            "host": "192.168.0.81",
+            "port": 5432,
+            "user": "freshrss_user",
+            "password": "j^qrJg2*R8g&oUT",
+            "database": "freshrss",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
+            "name": "litellmdb",
+            "type": "postgresql",
+            "host": "192.168.0.81",
+            "port": 5432,
+            "user": "sincerity",
+            "password": "v*LOwbV%3G4n",
+            "database": "litellmdb",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
+            "name": "n8n",
+            "type": "postgresql",
+            "host": "192.168.0.81",
+            "port": 5432,
+            "user": "n8n_user",
+            "password": "tdw^3&oW3eEA@aE",
+            "database": "n8n",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
+            "name": "webui",
+            "type": "postgresql",
+            "host": "192.168.0.81",
+            "port": 5432,
+            "user": "webui_user",
+            "password": "OtLCO8xkkjLv0yC",
+            "database": "webui",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
+            "name": "homeassistant",
+            "type": "mariadb",
+            "host": "192.168.0.81",
+            "port": 3306,
+            "user": "homeassistant",
+            "password": "Akinom88*",
+            "database": "homeassistant",
+            "backup_path": "/mnt/pendrak1/backup-dbs/mariadb",
+            "docker_container": "mariadb",
+            "use_docker_exec": true
+        },
+        {
+            "name": "npm",
+            "type": "mariadb",
+            "host": "192.168.0.81",
+            "port": 3306,
+            "user": "npm",
+            "password": "yvgpTLLMx7JcvNFmHJ",
+            "database": "npm",
+            "backup_path": "/mnt/pendrak1/backup-dbs/mariadb",
+            "docker_container": "mariadb",
+            "use_docker_exec": true
+        },
+        {
+            "name": "mikrus-mariadb",
+            "type": "mariadb",
+            "host": "mysql.mikr.us",
+            "port": 3306,
+            "user": "p291",
+            "password": "56A9_88c4b0",
+            "database": "db_p291",
+            "backup_path": "/mnt/pendrak1/backup-dbs/mariadb"
+        }
+    ]
+}

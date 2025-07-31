@@ -1,0 +1,54 @@
+{
+    "databases": [
+        {
+            "name": "freshrss",
+            "type": "postgresql",
+            "host": "192.168.0.81",
+            "port": 5432,
+            "user": "freshrss_user",
+            "password": "j^qrJg2*R8g&oUT",
+            "database": "freshrss",
+            "backup_path": "./backups/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true,
+            "comment": "Uses Docker exec - no client tools needed on host"
+        },
+        {
+            "name": "postgres_local",
+            "type": "postgresql",
+            "host": "localhost",
+            "port": 5432,
+            "user": "Surfboard0741",
+            "password": "4ZPQGLgvv2C9v!l",
+            "database": "local",
+            "backup_path": "./backups/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": false,
+            "comment": "Uses host client tools - requires postgresql-client installation"
+        },
+        {
+            "name": "mariadb_example",
+            "type": "mariadb",
+            "host": "localhost",
+            "port": 3306,
+            "user": "root",
+            "password": "password",
+            "database": "test_db",
+            "backup_path": "./backups/mariadb",
+            "docker_container": "mariadb_container",
+            "use_docker_exec": true
+        },
+        {
+            "name": "mongodb_example",
+            "type": "mongodb",
+            "host": "localhost",
+            "port": 27017,
+            "user": "mongoUser",
+            "password": "password",
+            "database": "test_db",
+            "backup_path": "./backups/mongodb",
+            "docker_container": "mongo_container",
+            "use_docker_exec": true
+        }
+    ]
+}
