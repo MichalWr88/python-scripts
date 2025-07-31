@@ -1,0 +1,13 @@
+{
+  "volumes": [
+    "portainer_portainer_data"
+  ],
+  "containers": [
+    "scrum-poker-backend",
+    "nginx-proxy-manager",
+    "portainer",
+    "wud"
+  ],
+  "backup_dir": "/root/docker_backup",
+  "webhook_url": "https://n8nmm.czartoha.pl/webhook-test/8a4769b0-d730-4ebb-b9ee-0d47cbb2a278"
+}
