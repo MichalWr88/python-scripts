@@ -169,8 +169,10 @@ log "INFO" "Ustawienia: CRF=$CRF, Preset=$PRESET, Backup=$BACKUP_MODE, MaxIncrea
 # Funkcja do sprawdzania, czy plik został już przetworzony
 is_already_processed() {
     local filepath="$1"
+    # Sprawdź w success.txt dokładne dopasowanie
     grep -Fxq "$filepath" "$SUCCESS_FILE" 2>/dev/null && return 0
-    grep -Fxq "$filepath" "$ERROR_FILE" 2>/dev/null && return 0
+    # Sprawdź w errors.txt czy ścieżka występuje na początku linii
+    grep -q "^$filepath" "$ERROR_FILE" 2>/dev/null && return 0
     return 1
 }
 
