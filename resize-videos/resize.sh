@@ -8,6 +8,7 @@
 #   -p, --preset VALUE  Preset (ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow)
 #   -b, --backup        Twórz kopie zapasowe zamiast nadpisywać
 #   -v, --verbose       Szczegółowe logowanie
+#   --max-increase N    Maksymalny wzrost rozmiaru w % (domyślnie 110)
 #   -h, --help          Pokaż pomoc
 
 set -euo pipefail
@@ -17,6 +18,7 @@ DEFAULT_CRF=20
 DEFAULT_PRESET="slow"
 BACKUP_MODE=false
 VERBOSE=false
+MAX_SIZE_INCREASE=110  # Maksymalnie 110% oryginału (10% wzrost)
 SUPPORTED_FORMATS=("mp4" "avi" "mkv" "mov" "wmv" "flv" "webm" "m4v")
 
 # Funkcja pomocy
@@ -31,6 +33,7 @@ Opcje:
   -p, --preset VALUE  Preset FFmpeg (domyślnie $DEFAULT_PRESET)
   -b, --backup        Twórz kopie zapasowe zamiast nadpisywać
   -v, --verbose       Szczegółowe logowanie
+  --max-increase N    Maksymalny wzrost rozmiaru w % (domyślnie $MAX_SIZE_INCREASE)
   -h, --help          Pokaż tę pomoc
 
 Obsługiwane formaty: ${SUPPORTED_FORMATS[*]}
@@ -59,6 +62,12 @@ check_disk_space() {
     local file_size=$(stat -c%s "$file")
     local available_space=$(df "$(dirname "$file")" | awk 'NR==2 {print $4*1024}')
     
+    # Sprawdzenie czy wartości są liczbami całkowitymi
+    if ! [[ "$file_size" =~ ^[0-9]+$ ]] || ! [[ "$available_space" =~ ^[0-9]+$ ]]; then
+        log "WARN" "Nie można sprawdzić dostępnego miejsca na dysku"
+        return 0
+    fi
+    
     if [ "$file_size" -gt "$available_space" ]; then
         log "ERROR" "Niewystarczające miejsce na dysku dla pliku: $file"
         return 1
@@ -69,6 +78,7 @@ check_disk_space() {
 # Parsowanie argumentów
 CRF=$DEFAULT_CRF
 PRESET=$DEFAULT_PRESET
+MAX_INCREASE=$MAX_SIZE_INCREASE
 SRC_DIR=""
 
 while [[ $# -gt 0 ]]; do
@@ -85,6 +95,14 @@ while [[ $# -gt 0 ]]; do
             PRESET="$2"
             if ! [[ "$PRESET" =~ ^(ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow)$ ]]; then
                 log "ERROR" "Nieprawidłowy preset: $PRESET"
+                exit 1
+            fi
+            shift 2
+            ;;
+        --max-increase)
+            MAX_INCREASE="$2"
+            if ! [[ "$MAX_INCREASE" =~ ^[0-9]+$ ]] || [ "$MAX_INCREASE" -lt 100 ]; then
+                log "ERROR" "Maksymalny wzrost musi być liczbą >= 100"
                 exit 1
             fi
             shift 2
@@ -146,7 +164,7 @@ mkdir -p "$TEMP_DIR"
 touch "$SUCCESS_FILE" "$ERROR_FILE" "$LOG_FILE"
 
 log "INFO" "Rozpoczynanie konwersji w katalogu: $SRC_DIR"
-log "INFO" "Ustawienia: CRF=$CRF, Preset=$PRESET, Backup=$BACKUP_MODE"
+log "INFO" "Ustawienia: CRF=$CRF, Preset=$PRESET, Backup=$BACKUP_MODE, MaxIncrease=$MAX_INCREASE%"
 
 # Funkcja do sprawdzania, czy plik został już przetworzony
 is_already_processed() {
@@ -163,22 +181,21 @@ create_find_pattern() {
         if [ -n "$pattern" ]; then
             pattern="$pattern -o"
         fi
-        pattern="$pattern -iname \"*.$fmt\""
+        pattern="$pattern -iname *.${fmt}"
     done
-    echo "( $pattern )"
+    echo "$pattern"
 }
 
 # Znajdź pierwszy plik video rekurencyjnie, który nie był przetworzony
-FIND_PATTERN=$(create_find_pattern)
-FILE_TO_PROCESS=$(find "$SRC_DIR" -type f \( $(eval echo "$FIND_PATTERN") \) -print0 |
+FILE_TO_PROCESS=""
 while IFS= read -r -d '' file; do
     # absolutna ścieżka
     abs_path="$(readlink -f "$file")"
     if ! is_already_processed "$abs_path"; then
-        echo "$abs_path"
+        FILE_TO_PROCESS="$abs_path"
         break
     fi
-done)
+done < <(find "$SRC_DIR" -type f \( -iname "*.mp4" -o -iname "*.avi" -o -iname "*.mkv" -o -iname "*.mov" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.webm" -o -iname "*.m4v" \) -print0)
 
 if [ -z "$FILE_TO_PROCESS" ]; then
     log "INFO" "Brak nowych plików do przetworzenia."
@@ -247,7 +264,28 @@ if [ $RET_CODE -eq 0 ]; then
     # Porównanie rozmiarów plików
     ORIGINAL_SIZE=$(stat -c%s "$FILE_TO_PROCESS")
     NEW_SIZE=$(stat -c%s "$TEMP_FILE")
-    COMPRESSION_RATIO=$(echo "scale=1; $NEW_SIZE * 100 / $ORIGINAL_SIZE" | bc -l 2>/dev/null || echo "N/A")
+    
+    # Obliczenie procentu kompresji bez bc
+    if [ "$ORIGINAL_SIZE" -gt 0 ]; then
+        COMPRESSION_RATIO=$((NEW_SIZE * 100 / ORIGINAL_SIZE))
+    else
+        COMPRESSION_RATIO="N/A"
+    fi
+    
+    # Sprawdzenie czy nowy plik nie jest za duży
+    if [ "$COMPRESSION_RATIO" != "N/A" ] && [ "$COMPRESSION_RATIO" -gt "$MAX_INCREASE" ]; then
+        log "WARN" "Plik po konwersji jest większy niż dozwolone ($COMPRESSION_RATIO% > $MAX_INCREASE%)"
+        log "WARN" "Pozostawiam oryginalny plik bez zmian"
+        log "INFO" "Rozmiar: $(numfmt --to=iec $ORIGINAL_SIZE) -> $(numfmt --to=iec $NEW_SIZE) (${COMPRESSION_RATIO}% oryginału)"
+        
+        # Dodaj do pliku błędów z informacją o zbyt dużym rozmiarze
+        echo "$FILE_TO_PROCESS (size increase: ${COMPRESSION_RATIO}%)" >> "$ERROR_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] SKIPPED: $FILE_TO_PROCESS - size increased to ${COMPRESSION_RATIO}%" >> "$LOG_FILE"
+        
+        # Usuń plik tymczasowy i zakończ
+        rm -f "$TEMP_FILE"
+        exit 0
+    fi
     
     # Sukces - bezpieczne nadpisanie oryginału
     mv "$TEMP_FILE" "$FILE_TO_PROCESS"
