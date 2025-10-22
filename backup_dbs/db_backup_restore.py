@@ -122,40 +122,82 @@ def backup_mariadb(db: Dict[str, Any]) -> bool:
         env = os.environ.copy()
         env['MYSQL_PWD'] = db.get('password', '')
         
-        cmd = [
-            "mysqldump",
-            f"--host={db['host']}",
-            f"--port={db['port']}",
-            f"--user={db['user']}",
-            "--single-transaction",
-            "--routines",
-            "--triggers",
-            db['database']
-        ]
-
-        logging.info(f"Backup MariaDB bazy {db['database']} do pliku {backup_file}")
-        
-        with open(backup_file, "w", encoding="utf-8") as f:
-            result = subprocess.run(
-                cmd, 
-                stdout=f, 
-                stderr=subprocess.PIPE, 
-                env=env, 
-                text=True,
-                timeout=3600
-            )
-        
-        if result.returncode == 0:
-            file_size = os.path.getsize(backup_file)
-            logging.info(f"Backup bazy {db['database']} zakończony sukcesem. Rozmiar pliku: {file_size} bajtów")
-            cleanup_old_backups(db['backup_path'], db['database'])
-            return True
+        # Sprawdź czy używać docker exec
+        if db.get('use_docker_exec') and db.get('docker_container'):
+            # Dla docker exec musimy przekazać hasło jako parametr -p (niebezpieczne ale w kontenerze)
+            # W nowszych wersjach MariaDB, mysqldump jest aliasem dla mariadb-dump
+            cmd = [
+                "docker", "exec", "-i",
+                db['docker_container'],
+                "mariadb-dump",  # W kontenerze MariaDB używamy mariadb-dump
+                "-h", "localhost",  # w kontenerze używamy localhost
+                "-P", str(db['port']),
+                "-u", db['user'],
+                f"-p{db.get('password', '')}",  # Hasło jako parametr
+                "--single-transaction",
+                "--routines",
+                "--triggers",
+                db['database']
+            ]
+            
+            logging.info(f"Backup MariaDB bazy {db['database']} do pliku {backup_file} (używając Docker exec)")
+            
+            # Dla docker exec, przekierujemy stdout do pliku
+            with open(backup_file, "w", encoding="utf-8") as f:
+                result = subprocess.run(
+                    cmd, 
+                    stdout=f, 
+                    stderr=subprocess.PIPE, 
+                    text=True,
+                    timeout=3600
+                )
+            
+            if result.returncode == 0:
+                file_size = os.path.getsize(backup_file)
+                logging.info(f"Backup bazy {db['database']} zakończony sukcesem. Rozmiar pliku: {file_size} bajtów")
+                cleanup_old_backups(db['backup_path'], db['database'])
+                return True
+            else:
+                logging.error(f"Błąd podczas backupu bazy {db['database']}: {result.stderr}")
+                if os.path.exists(backup_file):
+                    os.remove(backup_file)
+                return False
         else:
-            logging.error(f"Błąd podczas backupu bazy {db['database']}: {result.stderr}")
-            # Usuń niepełny plik backup
-            if os.path.exists(backup_file):
-                os.remove(backup_file)
-            return False
+            # Standardowe wywołanie mysqldump na hoście
+            cmd = [
+                "mysqldump",
+                f"--host={db['host']}",
+                f"--port={db['port']}",
+                f"--user={db['user']}",
+                "--single-transaction",
+                "--routines",
+                "--triggers",
+                db['database']
+            ]
+
+            logging.info(f"Backup MariaDB bazy {db['database']} do pliku {backup_file}")
+            
+            with open(backup_file, "w", encoding="utf-8") as f:
+                result = subprocess.run(
+                    cmd, 
+                    stdout=f, 
+                    stderr=subprocess.PIPE, 
+                    env=env, 
+                    text=True,
+                    timeout=3600
+                )
+            
+            if result.returncode == 0:
+                file_size = os.path.getsize(backup_file)
+                logging.info(f"Backup bazy {db['database']} zakończony sukcesem. Rozmiar pliku: {file_size} bajtów")
+                cleanup_old_backups(db['backup_path'], db['database'])
+                return True
+            else:
+                logging.error(f"Błąd podczas backupu bazy {db['database']}: {result.stderr}")
+                # Usuń niepełny plik backup
+                if os.path.exists(backup_file):
+                    os.remove(backup_file)
+                return False
             
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout podczas backupu bazy {db['database']}")
@@ -179,38 +221,79 @@ def restore_mariadb(db: Dict[str, Any], backup_file: str) -> bool:
     env = os.environ.copy()
     env['MYSQL_PWD'] = db.get('password', '')
     
-    cmd = [
-        "mysql",
-        f"--host={db['host']}",
-        f"--port={db['port']}",
-        f"--user={db['user']}",
-        db['database']
-    ]
-    
-    try:
-        with open(backup_file, "r", encoding="utf-8") as f:
-            result = subprocess.run(
-                cmd, 
-                stdin=f, 
-                stderr=subprocess.PIPE, 
-                env=env, 
-                text=True,
-                timeout=3600
-            )
+    # Sprawdź czy używać docker exec
+    if db.get('use_docker_exec') and db.get('docker_container'):
+        cmd = [
+            "docker", "exec", "-i",
+            db['docker_container'],
+            "mariadb",  # W kontenerze MariaDB używamy mariadb zamiast mysql
+            "-h", "localhost",
+            "-P", str(db['port']),
+            "-u", db['user'],
+            f"-p{db.get('password', '')}",  # Hasło jako parametr
+            db['database']
+        ]
         
-        if result.returncode == 0:
-            logging.info(f"Przywracanie bazy {db['database']} zakończone sukcesem.")
-            restart_container(db.get("docker_container"))
-            return True
-        else:
-            logging.error(f"Błąd podczas przywracania bazy {db['database']}: {result.stderr}")
+        logging.info(f"Przywracanie MariaDB używając Docker exec")
+        
+        try:
+            with open(backup_file, "r", encoding="utf-8") as f:
+                result = subprocess.run(
+                    cmd, 
+                    stdin=f, 
+                    stderr=subprocess.PIPE, 
+                    env=env, 
+                    text=True,
+                    timeout=3600
+                )
+            
+            if result.returncode == 0:
+                logging.info(f"Przywracanie bazy {db['database']} zakończone sukcesem.")
+                restart_container(db.get("docker_container"))
+                return True
+            else:
+                logging.error(f"Błąd podczas przywracania bazy {db['database']}: {result.stderr}")
+                return False
+        except subprocess.TimeoutExpired:
+            logging.error(f"Timeout podczas przywracania bazy {db['database']}")
             return False
-    except subprocess.TimeoutExpired:
-        logging.error(f"Timeout podczas przywracania bazy {db['database']}")
-        return False
-    except Exception as e:
-        logging.error(f"Wyjątek podczas przywracania MariaDB: {e}")
-        return False
+        except Exception as e:
+            logging.error(f"Wyjątek podczas przywracania MariaDB: {e}")
+            return False
+    else:
+        # Standardowe wywołanie mysql na hoście
+        cmd = [
+            "mysql",
+            f"--host={db['host']}",
+            f"--port={db['port']}",
+            f"--user={db['user']}",
+            db['database']
+        ]
+        
+        try:
+            with open(backup_file, "r", encoding="utf-8") as f:
+                result = subprocess.run(
+                    cmd, 
+                    stdin=f, 
+                    stderr=subprocess.PIPE, 
+                    env=env, 
+                    text=True,
+                    timeout=3600
+                )
+            
+            if result.returncode == 0:
+                logging.info(f"Przywracanie bazy {db['database']} zakończone sukcesem.")
+                restart_container(db.get("docker_container"))
+                return True
+            else:
+                logging.error(f"Błąd podczas przywracania bazy {db['database']}: {result.stderr}")
+                return False
+        except subprocess.TimeoutExpired:
+            logging.error(f"Timeout podczas przywracania bazy {db['database']}")
+            return False
+        except Exception as e:
+            logging.error(f"Wyjątek podczas przywracania MariaDB: {e}")
+            return False
 
 
 def backup_postgresql(db: Dict[str, Any]) -> bool:
