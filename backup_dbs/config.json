@@ -49,6 +49,52 @@
             "use_docker_exec": true
         },
         {
+            "name":"directus-cms",
+            "type":"postgresql",
+            "host":"192.168.0.81",
+            "port": 5432,
+            "user": "directus_user",
+            "password": "hr^YH^gvaxOS0hL",
+            "database": "directus_db",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
+            "name":"firefly-iii",
+            "type":"postgresql",
+            "host":"192.168.0.81",
+            "port": 5432,
+            "user": "firefly_user",
+            "password": "0CguV8&r7&d*U0",
+            "database": "firefly",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },        {
+            "name":"metabase",
+            "type":"postgresql",
+            "host":"192.168.0.81",
+            "port": 5432,
+            "user": "Surfboard0741",
+            "password": "4ZPQGLgvv2C9v!l",
+            "database": "metabase",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },   {
+            "name":"nocodb",
+            "type":"postgresql",
+            "host":"192.168.0.81",
+            "port": 5432,
+            "user": "Surfboard0741",
+            "password": "4ZPQGLgvv2C9v!l",
+            "database": "nocodb",
+            "backup_path": "/mnt/pendrak1/backup-dbs/postgres",
+            "docker_container": "postgres",
+            "use_docker_exec": true
+        },
+        {
             "name": "homeassistant",
             "type": "mariadb",
             "host": "192.168.0.81",
