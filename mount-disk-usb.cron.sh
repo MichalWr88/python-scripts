@@ -1,11 +1,21 @@
 #!/bin/bash
 
+# Skrypt automatycznego montowania dysku USB z mechanizmami odzyskiwania
+# 
+# UWAGA: Plik logów jest nadpisywany przy każdym uruchomieniu skryptu
+# Tylko ostatnie wywołanie jest zachowane w logu
+#
+# Autor: Michał Małeszewski
+# Data: 2025-11-02
+
 # Punkt montowania
 MOUNT_POINT="/mnt/usb1"
 # UUID dysku (zmień na właściwy UUID gdy będzie dostępny)
 DISK_UUID="a4908213-f21d-41e7-b6e3-d1e1342fd1a9"
 # Log file
 LOG_FILE="/var/log/usb_mount.log"
+# Flaga pierwszego wywołania log_msg
+FIRST_LOG_CALL=true
 
 # Funkcja logowania
 log_msg() {
@@ -14,11 +24,21 @@ log_msg() {
     
     # Sprawdź czy można pisać do pliku logów
     if [ -w "$LOG_FILE" ] || [ -w "$(dirname "$LOG_FILE")" ]; then
-        echo "$(date): $msg" >> "$LOG_FILE" 2>/dev/null || true
+        if [ "$FIRST_LOG_CALL" = "true" ]; then
+            echo "$(date): $msg" > "$LOG_FILE" 2>/dev/null || true
+            FIRST_LOG_CALL=false
+        else
+            echo "$(date): $msg" >> "$LOG_FILE" 2>/dev/null || true
+        fi
     else
         # Jeśli nie można pisać do /var/log, użyj lokalnego pliku
         local local_log="./usb_mount.log"
-        echo "$(date): $msg" >> "$local_log" 2>/dev/null || true
+        if [ "$FIRST_LOG_CALL" = "true" ]; then
+            echo "$(date): $msg" > "$local_log" 2>/dev/null || true
+            FIRST_LOG_CALL=false
+        else
+            echo "$(date): $msg" >> "$local_log" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -105,8 +125,14 @@ reset_usb_device() {
                     sleep 2
                     echo 1 > "$usb_path/authorized" 2>/dev/null && log_msg "Autoryzacja: OK" || log_msg "Autoryzacja: BŁĄD"
                     reset_count=$((reset_count + 1))
+                elif [ -f "$usb_path/authorized" ]; then
+                    log_msg "Próba resetu z sudo dla $device_name..."
+                    sudo sh -c "echo 0 > '$usb_path/authorized'" 2>/dev/null && log_msg "Deautoryzacja sudo: OK" || log_msg "Deautoryzacja sudo: BŁĄD"
+                    sleep 2
+                    sudo sh -c "echo 1 > '$usb_path/authorized'" 2>/dev/null && log_msg "Autoryzacja sudo: OK" || log_msg "Autoryzacja sudo: BŁĄD"
+                    reset_count=$((reset_count + 1))
                 else
-                    log_msg "Brak uprawnień do resetu $usb_path/authorized"
+                    log_msg "Brak uprawnień do resetu $usb_path/authorized (plik nie istnieje lub brak dostępu)"
                 fi
             fi
         fi
@@ -141,6 +167,51 @@ recover_usb_storage() {
     sleep 10
 }
 
+# Funkcja debug dla problemów z montowaniem
+debug_mount_issues() {
+    local device="$1"
+    local mount_point="$2"
+    
+    log_msg "=== DEBUG MONTOWANIA ==="
+    log_msg "Urządzenie: $device"
+    log_msg "Punkt montowania: $mount_point"
+    
+    # Sprawdź czy urządzenie istnieje
+    if [ -b "$device" ]; then
+        log_msg "✓ Urządzenie blokowe $device istnieje"
+    else
+        log_msg "✗ Urządzenie blokowe $device NIE istnieje"
+    fi
+    
+    # Sprawdź punkt montowania
+    if [ -d "$mount_point" ]; then
+        log_msg "✓ Punkt montowania $mount_point istnieje"
+        log_msg "Uprawnienia: $(ls -ld "$mount_point")"
+    else
+        log_msg "✗ Punkt montowania $mount_point NIE istnieje"
+    fi
+    
+    # Sprawdź czy coś już jest zamontowane
+    if mount | grep -q "$mount_point"; then
+        log_msg "⚠ Coś już jest zamontowane w $mount_point:"
+        mount | grep "$mount_point"
+    else
+        log_msg "✓ Punkt montowania $mount_point jest wolny"
+    fi
+    
+    # Sprawdź system plików
+    local fs_type=$(sudo blkid "$device" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2)
+    log_msg "System plików: $fs_type"
+    
+    # Sprawdź czy można czytać z urządzenia
+    if sudo dd if="$device" of=/dev/null bs=512 count=1 >/dev/null 2>&1; then
+        log_msg "✓ Można czytać z $device"
+    else
+        log_msg "✗ NIE można czytać z $device"
+    fi
+    
+    log_msg "=== KONIEC DEBUG ==="
+}
 # Funkcja debug - pokaż dostępne urządzenia USB
 show_usb_devices() {
     log_msg "DEBUG: Dostępne urządzenia USB:"
@@ -228,7 +299,53 @@ fi
 DEVICE_INFO="$DEVICE_TO_MOUNT"
 log_msg "Znaleziono urządzenie: $DEVICE_INFO"
 
-# Sprawdzenie, czy punkt montowania znajduje się w wyjściu komendy mount
+# Sprawdzenie, czy to konkretne urządzenie jest zamontowane w punkt montowania
+MOUNTED_DEVICE_UUID=""
+MOUNTED_DEVICE_PATH=""
+
+if mount | grep -q "$MOUNT_POINT"; then
+    # Sprawdź co jest zamontowane w tym punkcie
+    MOUNTED_DEVICE_PATH=$(mount | grep "$MOUNT_POINT" | awk '{print $1}' | head -1)
+    
+    # Sprawdź UUID zamontowanego urządzenia
+    if [ -n "$MOUNTED_DEVICE_PATH" ]; then
+        MOUNTED_DEVICE_UUID=$(sudo blkid "$MOUNTED_DEVICE_PATH" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2 2>/dev/null)
+    fi
+    
+    log_msg "W punkcie $MOUNT_POINT jest zamontowane: $MOUNTED_DEVICE_PATH (UUID: $MOUNTED_DEVICE_UUID)"
+fi
+
+# Sprawdź czy nasze urządzenie jest już zamontowane w prawidłowym miejscu
+OUR_UUID=$(echo "$DEVICE_TO_MOUNT" | grep -o '[a-f0-9-]\{36\}' || sudo blkid "$DEVICE_TO_MOUNT" | grep -o 'UUID="[^"]*"' | cut -d'"' -f2)
+
+if [ "$MOUNTED_DEVICE_UUID" = "$OUR_UUID" ] && [ -n "$OUR_UUID" ]; then
+    log_msg "Nasz dysk (UUID: $OUR_UUID) jest już poprawnie zamontowany w $MOUNT_POINT. Sprawdzanie stanu..."
+    
+    # Sprawdź stan zamontowanego dysku
+    if [ -n "$MOUNTED_DEVICE_PATH" ]; then
+        check_disk_health "$MOUNTED_DEVICE_PATH"
+        log_msg "Stan dysku: OK, zamontowany jako $MOUNTED_DEVICE_PATH"
+    fi
+    exit 0
+elif mount | grep -q "$MOUNT_POINT"; then
+    log_msg "W $MOUNT_POINT jest zamontowane inne urządzenie ($MOUNTED_DEVICE_PATH, UUID: $MOUNTED_DEVICE_UUID)"
+    log_msg "Nasze urządzenie ma UUID: $OUR_UUID - wymaga odmontowania i ponownego montowania"
+    
+    # Odmontuj nieprawidłowe urządzenie
+    log_msg "Odmontowywanie $MOUNTED_DEVICE_PATH z $MOUNT_POINT..."
+    UMOUNT_OUTPUT=$(sudo umount "$MOUNT_POINT" 2>&1)
+    UMOUNT_EXIT_CODE=$?
+    
+    if [ $UMOUNT_EXIT_CODE -eq 0 ]; then
+        log_msg "Odmontowanie zakończone sukcesem"
+    else
+        log_msg "BŁĄD odmontowania: $UMOUNT_OUTPUT (kod: $UMOUNT_EXIT_CODE)"
+        log_msg "Próba wymuszenia odmontowania..."
+        sudo umount -f "$MOUNT_POINT" 2>/dev/null || sudo umount -l "$MOUNT_POINT" 2>/dev/null
+        sleep 2
+    fi
+fi
+
 if ! mount | grep -q "$MOUNT_POINT"; then
     log_msg "Dysk $DEVICE_INFO nie jest podmontowany. Próba montowania..."
     
@@ -243,11 +360,18 @@ if ! mount | grep -q "$MOUNT_POINT"; then
         log_msg "OSTRZEŻENIE: Problemy z dyskiem przed montowaniem"
     fi
     
+    # Debug montowania
+    debug_mount_issues "$DEVICE_TO_MOUNT" "$MOUNT_POINT"
+    
     # Użycie 'mount' z prawami roota
-    sudo mount "$DEVICE_TO_MOUNT" "$MOUNT_POINT"
+    log_msg "Próba montowania: sudo mount \"$DEVICE_TO_MOUNT\" \"$MOUNT_POINT\""
+    
+    # Zapisz stdout i stderr do zmiennych
+    MOUNT_OUTPUT=$(sudo mount "$DEVICE_TO_MOUNT" "$MOUNT_POINT" 2>&1)
+    MOUNT_EXIT_CODE=$?
 
     # Sprawdzenie, czy montowanie się powiodło
-    if [ $? -eq 0 ]; then
+    if [ $MOUNT_EXIT_CODE -eq 0 ]; then
         log_msg "Montowanie $DEVICE_INFO do $MOUNT_POINT zakończone sukcesem."
         
         # Sprawdź stan dysku po montowaniu
@@ -261,6 +385,8 @@ if ! mount | grep -q "$MOUNT_POINT"; then
         fi
     else
         log_msg "BŁĄD! Montowanie $DEVICE_INFO do $MOUNT_POINT nie powiodło się."
+        log_msg "Szczegółowy błąd: $MOUNT_OUTPUT"
+        log_msg "Kod błędu: $MOUNT_EXIT_CODE"
         log_msg "Ostatnia próba odzyskania..."
         
         # Ostatnia próba odzyskania
@@ -269,17 +395,18 @@ if ! mount | grep -q "$MOUNT_POINT"; then
             NEW_DEVICE=$(find_usb_disk)
             if [ -n "$NEW_DEVICE" ]; then
                 log_msg "Ponowna próba montowania z $NEW_DEVICE"
-                sudo mount "$NEW_DEVICE" "$MOUNT_POINT" && log_msg "Montowanie po odzyskaniu: SUKCES" || log_msg "Montowanie po odzyskaniu: BŁĄD"
+                NEW_MOUNT_OUTPUT=$(sudo mount "$NEW_DEVICE" "$MOUNT_POINT" 2>&1)
+                NEW_MOUNT_EXIT_CODE=$?
+                if [ $NEW_MOUNT_EXIT_CODE -eq 0 ]; then
+                    log_msg "Montowanie po odzyskaniu: SUKCES"
+                else
+                    log_msg "Montowanie po odzyskaniu: BŁĄD"
+                    log_msg "Błąd odzyskania: $NEW_MOUNT_OUTPUT"
+                    log_msg "Kod błędu odzyskania: $NEW_MOUNT_EXIT_CODE"
+                fi
             fi
         fi
     fi
 else
-    log_msg "Dysk jest już podmontowany w $MOUNT_POINT. Sprawdzanie stanu..."
-    
-    # Sprawdź stan zamontowanego dysku
-    MOUNTED_DEVICE=$(mount | grep "$MOUNT_POINT" | awk '{print $1}' | head -1)
-    if [ -n "$MOUNTED_DEVICE" ]; then
-        check_disk_health "$MOUNTED_DEVICE"
-        log_msg "Stan dysku: OK, zamontowany jako $MOUNTED_DEVICE"
-    fi
+    log_msg "Punkt montowania $MOUNT_POINT jest wolny - dysk nie jest zamontowany"
 fi
